@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { join } from 'path';
+import { ServeStaticModule } from '@nestjs/serve-static';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule'; 
 import { AppController } from './app.controller';
@@ -13,6 +15,7 @@ import { BloqueioModule } from './bloqueio/bloqueio.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { LembreteModule } from './lembrete/lembrete.module';
 import { ConfiguracaoAgendaModule } from './configuracao-agenda/configuracao-agenda.module';
+import { RelatoriosModule } from './relatorios/relatorios.module';
 
 @Module({
   imports: [
@@ -26,7 +29,13 @@ import { ConfiguracaoAgendaModule } from './configuracao-agenda/configuracao-age
     AuthModule, 
     BloqueioModule,
     DashboardModule, 
-    LembreteModule, ConfiguracaoAgendaModule
+    LembreteModule, 
+    ConfiguracaoAgendaModule,
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'uploads'),
+      serveRoot: '/uploads',
+    }),
+    RelatoriosModule,
   ],
   controllers: [AppController],
   providers: [AppService],

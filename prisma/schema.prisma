@@ -1,87 +1,112 @@
-// prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
-  // A URL deve estar no seu arquivo .env como DATABASE_URL
+
 }
 
-// 1. USUÁRIOS (Sistema de Login)
+enum Role {
+  ADMIN
+  PROFISSIONAL
+}
+
 model Usuario {
-  id        String   @id @default(uuid())
-  nome      String
-  email     String   @unique
-  senha     String
-  criado_em DateTime @default(now())
+  id            String        @id @default(uuid())
+  nome          String
+  email         String        @unique
+  senha         String
+  role          Role          @default(PROFISSIONAL)
+  ativo         Boolean       @default(true)
+  criado_em     DateTime      @default(now())
+  atualizado_em DateTime      @updatedAt
+  agendamentos  Agendamento[]
 
   @@map("usuarios")
 }
 
-// 2. PACIENTES
 model Paciente {
-  id           String        @id @default(uuid())
+  id           String         @id @default(uuid())
   nome         String
-  cpf          String        @unique
+  cpf          String         @unique
   telefone     String
   email        String?
+  observacoes  String?        @db.Text
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  fotos        FotoPaciente[]
   agendamentos Agendamento[]
-  createdAt    DateTime      @default(now())
+
+  @@map("pacientes")
 }
 
-// 3. SERVIÇOS / PROCEDIMENTOS
+model FotoPaciente {
+  id         String   @id @default(uuid())
+  url        String
+  legenda    String?
+  criado_em  DateTime @default(now())
+  paciente   Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  pacienteId String
+
+  @@map("fotos_pacientes")
+}
+
 model Servico {
-  id               String        @id @default(uuid())
-  nome             String
-  duracao_minutos  Int
-  valor            Decimal       @db.Decimal(10, 2)
-  agendamentos     Agendamento[]
+  id              String        @id @default(uuid())
+  nome            String
+  duracao_minutos Int
+  valor           Decimal       @db.Decimal(10, 2)
+  ativo           Boolean       @default(true)
+  agendamentos    Agendamento[]
+
+  @@map("servicos")
 }
 
-// 4. AGENDAMENTOS (Com Status via Enum)
-model Agendamento {
-  id          String            @id @default(uuid())
-  data_inicio DateTime
-  data_fim    DateTime
-  status      StatusAgendamento @default(AGENDADO)
-  
-  paciente    Paciente          @relation(fields: [pacienteId], references: [id])
-  pacienteId  String
-  
-  servico     Servico           @relation(fields: [servicoId], references: [id])
-  servicoId   String
-
-  createdAt   DateTime          @default(now())
-}
-
-// 5. BLOQUEIOS (Pausas manuais na agenda)
-model Bloqueio {
-  id          String   @id @default(uuid())
-  data_inicio DateTime
-  data_fim    DateTime
-  motivo      String?
-  criado_em   DateTime @default(now())
-}
-
-// 6. CONFIGURAÇÕES DE EXPEDIENTE (Regras de Ouro)
-model ConfiguracaoAgenda {
-  id            Int     @id @default(autoincrement())
-  dia_semana    Int     @unique // 0 (Dom) a 6 (Sab)
-  nome          String  // Ex: Segunda-feira
-  ativo         Boolean @default(true)
-  abertura      String  // Ex: "08:00"
-  fechamento    String  // Ex: "18:00"
-  almoco_inicio String  // Ex: "12:00"
-  almoco_fim    String  // Ex: "13:00"
-}
-
-// ENUMS (Listas fixas de opções)
 enum StatusAgendamento {
   AGENDADO
   CONFIRMADO
   CANCELADO
   CONCLUIDO
   FALTOU
+}
+
+model Agendamento {
+  id             String            @id @default(uuid())
+  data_inicio    DateTime
+  data_fim       DateTime
+  status         StatusAgendamento @default(AGENDADO)
+  observacoes    String?           @db.Text
+  createdAt      DateTime          @default(now())
+  paciente       Paciente          @relation(fields: [pacienteId], references: [id])
+  pacienteId     String
+  servico        Servico           @relation(fields: [servicoId], references: [id])
+  servicoId      String
+  profissional   Usuario           @relation(fields: [profissionalId], references: [id])
+  profissionalId String
+
+  @@map("agendamentos")
+}
+
+model Bloqueio {
+  id          String   @id @default(uuid())
+  data_inicio DateTime
+  data_fim    DateTime
+  motivo      String?
+  criado_em   DateTime @default(now())
+
+  @@map("bloqueios")
+}
+
+model ConfiguracaoAgenda {
+  id            Int     @id @default(autoincrement())
+  dia_semana    Int     @unique
+  nome          String
+  ativo         Boolean @default(true)
+  abertura      String
+  fechamento    String
+  almoco_inicio String
+  almoco_fim    String
+
+  @@map("configuracoes_agenda")
 }

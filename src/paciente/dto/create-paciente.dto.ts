@@ -22,4 +22,10 @@ export class CreatePacienteDto {
   @IsEmail({}, { message: 'E-mail inválido' })
   @IsOptional() // Como o e-mail não é obrigatório no banco, usamos isso
   email?: string;
+
+  // --- NOVO CAMPO DE ANOTAÇÕES DO PRONTUÁRIO ---
+  @ApiPropertyOptional({ example: 'Paciente possui alergia a ácido retinóico.' })
+  @IsString()
+  @IsOptional() 
+  observacoes?: string;
 }

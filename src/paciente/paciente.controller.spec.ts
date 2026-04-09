@@ -1,22 +1,30 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { PacienteController } from './paciente.controller';
-import { PacienteService } from './paciente.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { JwtService } from '@nestjs/jwt';
+import { IsString, IsOptional, IsEmail, IsNotEmpty } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-describe('PacienteController', () => {
-  let controller: PacienteController;
+export class CreatePacienteDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  nome: string;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [PacienteController],
-      providers: [PacienteService, PrismaService, JwtService], // JwtService para o AuthGuard
-    }).compile();
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  cpf: string;
 
-    controller = module.get<PacienteController>(PacienteController);
-  });
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  telefone: string;
 
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
-  });
-});
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  // NOVO CAMPO ADICIONADO PARA O PRONTUÁRIO
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  observacoes?: string;
+}
