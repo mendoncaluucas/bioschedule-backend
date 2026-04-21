@@ -1,34 +1,36 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import * as bcrypt from 'bcrypt';
+import { CreateUsuarioDto } from './dto/create-usuario.dto';
 
 @Injectable()
 export class UsuarioService {
   constructor(private prisma: PrismaService) {}
 
   async create(createUsuarioDto: CreateUsuarioDto) {
-    const usuarioExiste = await this.prisma.usuario.findUnique({
+    const usuarioExistente = await this.prisma.usuario.findUnique({
       where: { email: createUsuarioDto.email },
     });
 
-    if (usuarioExiste) {
+    if (usuarioExistente) {
       throw new ConflictException('Este e-mail já está em uso.');
     }
 
-    const senhaCriptografada = await bcrypt.hash(createUsuarioDto.senha, 10);
+    const salt = await bcrypt.genSalt();
+    const senhaHash = await bcrypt.hash(createUsuarioDto.senha, salt);
 
-    const novoUsuario = await this.prisma.usuario.create({
+    const usuario = await this.prisma.usuario.create({
       data: {
         nome: createUsuarioDto.nome,
         email: createUsuarioDto.email,
-        senha: senhaCriptografada,
+        senha: senhaHash,
         role: createUsuarioDto.role || 'PROFISSIONAL',
+        ativo: false, 
       },
     });
 
-    const { senha, ...usuarioSemSenha } = novoUsuario;
-    return usuarioSemSenha;
+    delete (usuario as any).senha;
+    return usuario;
   }
 
   async findAll() {
@@ -41,7 +43,6 @@ export class UsuarioService {
         ativo: true,
         criado_em: true,
       },
-      orderBy: { nome: 'asc' },
     });
   }
 
@@ -51,29 +52,40 @@ export class UsuarioService {
     });
   }
 
-  async findOne(id: string) {
-    const usuario = await this.prisma.usuario.findUnique({
-      where: { id },
+  async findEquipePublica() {
+    return this.prisma.usuario.findMany({
+      where: {
+        ativo: true,
+        OR: [
+          { role: 'ADMIN' },
+          { role: 'PROFISSIONAL' }
+        ]
+      },
       select: {
         id: true,
         nome: true,
-        email: true,
         role: true,
-        ativo: true,
-      },
+      }
     });
+  }
 
-    if (!usuario) throw new NotFoundException('Usuário não encontrado.');
-    return usuario;
+  async update(id: string, updateData: any) {
+    const usuario = await this.prisma.usuario.findUnique({ where: { id } });
+    if (!usuario) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+
+    return this.prisma.usuario.update({
+      where: { id },
+      data: updateData,
+    });
   }
 
   async remove(id: string) {
-    try {
-      await this.findOne(id);
-      return await this.prisma.usuario.delete({ where: { id } });
-    } catch (error) {
-      if (error instanceof NotFoundException) throw error;
-      throw new BadRequestException('Usuário possui vínculos e não pode ser removido.');
+    const usuario = await this.prisma.usuario.findUnique({ where: { id } });
+    if (!usuario) {
+      throw new NotFoundException('Usuário não encontrado.');
     }
+    return this.prisma.usuario.delete({ where: { id } });
   }
 }

@@ -1,4 +1,8 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpCode, HttpStatus, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { 
+  Controller, Get, Post, Body, Patch, Put, Param, Delete, 
+  UseGuards, HttpCode, HttpStatus, UseInterceptors, 
+  UploadedFile, BadRequestException 
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '../auth/auth.guard';
 import { ApiBearerAuth, ApiTags, ApiConsumes } from '@nestjs/swagger';
@@ -9,7 +13,7 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import * as fs from 'fs';
 
-@Controller('paciente')
+@Controller('paciente') // Voltamos para o padrão singular exato do seu frontend
 @UseGuards(AuthGuard)
 @ApiTags('paciente')
 @ApiBearerAuth()
@@ -31,8 +35,16 @@ export class PacienteController {
     return this.pacienteService.findOne(id);
   }
 
+  // ✨ O SEGREDO ESTÁ AQUI: Funções separadas para não bugar o NestJS!
+  // Atende quem mandar PUT
+  @Put(':id')
+  updatePut(@Param('id') id: string, @Body() updatePacienteDto: UpdatePacienteDto) {
+    return this.pacienteService.update(id, updatePacienteDto);
+  }
+
+  // Atende quem mandar PATCH
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePacienteDto: UpdatePacienteDto) {
+  updatePatch(@Param('id') id: string, @Body() updatePacienteDto: UpdatePacienteDto) {
     return this.pacienteService.update(id, updatePacienteDto);
   }
 
@@ -63,9 +75,7 @@ export class PacienteController {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo de imagem enviado.');
     }
-
     const fileUrl = `http://localhost:3000/uploads/${file.filename}`;
-
     return this.pacienteService.salvarFoto(id, fileUrl);
   }
 
