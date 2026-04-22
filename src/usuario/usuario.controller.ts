@@ -7,19 +7,24 @@ import { AuthGuard } from '../auth/auth.guard';
 export class UsuarioController {
   constructor(private readonly usuarioService: UsuarioService) {}
 
-  // ✨ ROTA PÚBLICA (Para listar profissionais no site)
+  // ==========================================
+  // ✨ ROTAS PÚBLICAS
+  // ==========================================
+
   @Get('publico/equipe')
   findEquipePublica() {
     return this.usuarioService.findEquipePublica();
   }
 
-  // 🔒 ROTAS PRIVADAS (Exigem Login)
-
-  @UseGuards(AuthGuard)
+  // ✨ CORREÇÃO AQUI: Removemos o AuthGuard para permitir o cadastro!
   @Post()
   create(@Body() createUsuarioDto: CreateUsuarioDto) {
     return this.usuarioService.create(createUsuarioDto);
   }
+
+  // ==========================================
+  // 🔒 ROTAS PRIVADAS (Painel Administrativo)
+  // ==========================================
 
   @UseGuards(AuthGuard)
   @Get()
@@ -27,8 +32,6 @@ export class UsuarioController {
     return this.usuarioService.findAll();
   }
 
-  // ✨ ADICIONADO: Rota para aprovar/atualizar usuário
-  // Resolve o erro 404 ao tentar aprovar
   @UseGuards(AuthGuard)
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateData: any) {
