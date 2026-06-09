@@ -23,7 +23,7 @@ export class AuthService {
       throw new UnauthorizedException('E-mail ou senha inválidos.');
     }
 
-    // ✨ TRAVA DE SEGURANÇA: Verifica se o usuário está ativo
+    // TRAVA DE SEGURANÇA: Verifica se o usuário está ativo
     // Se o Admin ainda não aprovou (ativo: false), barramos o login aqui.
     if (!usuario.ativo) {
       throw new ForbiddenException('Sua conta ainda aguarda aprovação de um administrador.');

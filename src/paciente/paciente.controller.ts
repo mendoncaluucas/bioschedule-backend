@@ -75,7 +75,8 @@ export class PacienteController {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo de imagem enviado.');
     }
-    const fileUrl = `http://localhost:3000/uploads/${file.filename}`;
+    const baseUrl = process.env.APP_BASE_URL || 'http://localhost:3000';
+    const fileUrl = `${baseUrl}/uploads/${file.filename}`;
     return this.pacienteService.salvarFoto(id, fileUrl);
   }
 

@@ -4,14 +4,19 @@ import { AuthController } from './auth.controller';
 import { UsuarioModule } from '../usuario/usuario.module';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthGuard } from './auth.guard';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
     UsuarioModule,
-    JwtModule.register({
+    JwtModule.registerAsync({
       global: true,
-      secret: process.env.JWT_SECRET, 
-      signOptions: { expiresIn: '8h' }, // O usuário fica logado por 8 horas
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.getOrThrow<string>('JWT_SECRET'),
+        signOptions: { expiresIn: config.get('JWT_EXPIRES_IN', '8h') as any },
+      }),
     }),
   ],
   controllers: [AuthController],

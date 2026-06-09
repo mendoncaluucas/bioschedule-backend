@@ -1,7 +1,12 @@
-import { Controller, Get, Query, Res, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Query, Res, BadRequestException, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { RelatoriosService } from './relatorios.service';
+import { AuthGuard } from '../auth/auth.guard';
 
+@ApiTags('Relatórios')
+@ApiBearerAuth()
+@UseGuards(AuthGuard)
 @Controller('relatorios')
 export class RelatoriosController {
   constructor(private readonly relatoriosService: RelatoriosService) {}

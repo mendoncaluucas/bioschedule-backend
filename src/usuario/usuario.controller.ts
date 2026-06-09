@@ -1,6 +1,7 @@
 import { Controller, Post, Body, Get, Delete, Param, Patch, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
 import { UsuarioService } from './usuario.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
+import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { AuthGuard } from '../auth/auth.guard';
 
 @Controller('usuarios')
@@ -34,7 +35,7 @@ export class UsuarioController {
 
   @UseGuards(AuthGuard)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateData: any) {
+  update(@Param('id') id: string, @Body() updateData: UpdateUsuarioDto) {
     return this.usuarioService.update(id, updateData);
   }
 

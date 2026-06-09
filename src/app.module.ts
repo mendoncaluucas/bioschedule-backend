@@ -16,6 +16,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { LembreteModule } from './lembrete/lembrete.module';
 import { ConfiguracaoAgendaModule } from './configuracao-agenda/configuracao-agenda.module';
 import { RelatoriosModule } from './relatorios/relatorios.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { RelatoriosModule } from './relatorios/relatorios.module';
       serveRoot: '/uploads',
     }),
     RelatoriosModule,
+    WhatsappModule,
   ],
   controllers: [AppController],
   providers: [AppService],

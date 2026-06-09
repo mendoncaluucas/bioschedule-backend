@@ -1,12 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 
 @Injectable()
 export class LembreteService {
   private readonly logger = new Logger(LembreteService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private whatsappService: WhatsappService,
+  ) {}
 
   // ⏰ Roda todos os dias às 08:00 da manhã
   @Cron(CronExpression.EVERY_DAY_AT_8AM) 
@@ -38,16 +42,27 @@ export class LembreteService {
       return;
     }
 
-    // 3. Simula o disparo de mensagens
+    // 3. Dispara lembretes reais via WhatsApp
+    let enviados = 0;
     for (const agendamento of agendamentos) {
       // Pega o horário no formato HH:MM
       const hora = agendamento.data_inicio.toISOString().substring(11, 16); 
       
-      this.logger.verbose(
-        `📱 [WHATSAPP ENVIADO] Para: ${agendamento.paciente.nome} | Mensagem: "Olá! Passando para lembrar do seu horário de ${agendamento.servico.nome} amanhã às ${hora}."`
-      );
+      try {
+        await this.whatsappService.sendMessage(
+          agendamento.paciente.telefone,
+          `🔔 *BioSchedule - Lembrete*\n\n` +
+          `Olá, ${agendamento.paciente.nome}! ` +
+          `Lembramos que você tem um horário de *${agendamento.servico.nome}* ` +
+          `amanhã às *${hora}*.\n\n` +
+          `Te esperamos! 💙`
+        );
+        enviados++;
+      } catch (err) {
+        this.logger.error(`Falha ao enviar lembrete para ${agendamento.paciente.nome}:`, err);
+      }
     }
 
-    this.logger.log(`✅ Sucesso! ${agendamentos.length} lembretes disparados.`);
+    this.logger.log(`✅ Sucesso! ${enviados}/${agendamentos.length} lembretes disparados.`);
   }
 }

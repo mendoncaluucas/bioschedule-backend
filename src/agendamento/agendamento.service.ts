@@ -1,12 +1,18 @@
-import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { MailService } from '../email/mail.service'; 
+import { MailService } from '../email/mail.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
+import { CreateAgendamentoDto } from './dto/create-agendamento.dto';
+import { UpdateAgendamentoDto } from './dto/update-agendamento.dto';
 
 @Injectable()
 export class AgendamentoService {
+  private readonly logger = new Logger(AgendamentoService.name);
+
   constructor(
     private prisma: PrismaService,
-    private mailService: MailService 
+    private mailService: MailService,
+    private whatsappService: WhatsappService,
   ) {}
 
   // ==========================================
@@ -42,9 +48,7 @@ export class AgendamentoService {
   // ==========================================
   // CRIAR AGENDAMENTO (Painel Admin)
   // ==========================================
-  async create(dto: any) {
-    if (!dto.profissionalId) throw new BadRequestException('O ID do profissional responsável é obrigatório.');
-
+  async create(dto: CreateAgendamentoDto) {
     await this.validarRegrasAgenda(dto.data_inicio, dto.data_fim, dto.profissionalId);
 
     return this.prisma.agendamento.create({
@@ -52,7 +56,7 @@ export class AgendamentoService {
         data_inicio: new Date(dto.data_inicio),
         data_fim: new Date(dto.data_fim),
         observacoes: dto.observacoes,
-        status: dto.status || 'AGENDADO',
+        status: 'AGENDADO',
         paciente: { connect: { id: dto.pacienteId } },
         servico: { connect: { id: dto.servicoId } },
         profissional: { connect: { id: dto.profissionalId } }
@@ -148,7 +152,24 @@ export class AgendamentoService {
         hora: dados.hora
       });
     } catch (err) {
-      console.error('Falha não crítica ao disparar e-mail:', err);
+      this.logger.error('Falha não crítica ao disparar e-mail:', err);
+    }
+
+    // Disparo WhatsApp (não-bloqueante, não-crítico)
+    try {
+      const dataFormatada = dados.data.split('-').reverse().join('/');
+      await this.whatsappService.sendMessage(
+        dados.pacienteTelefone,
+        `✨ *BioSchedule - Confirmação de Agendamento*\n\n` +
+        `Olá, ${dados.pacienteNome}! Seu horário foi confirmado:\n\n` +
+        `📅 Data: ${dataFormatada}\n` +
+        `⏰ Hora: ${dados.hora}\n` +
+        `✂️ Procedimento: ${servico.nome}\n` +
+        `👤 Profissional: ${dados.profissionalNome}\n\n` +
+        `Qualquer dúvida, entre em contato conosco. Te esperamos! 💙`
+      );
+    } catch (err) {
+      this.logger.error('Falha não crítica ao disparar WhatsApp:', err);
     }
 
     return novoAgendamento;
@@ -208,7 +229,7 @@ export class AgendamentoService {
     return agendamento;
   }
 
-  async update(id: string, dto: any) {
+  async update(id: string, dto: UpdateAgendamentoDto) {
     const agendamento = await this.findOne(id);
     const profissionalIdAUsar = dto.profissionalId || agendamento.profissionalId;
 
