@@ -1,98 +1,61 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+#  Bioschedule: Sistema Inteligente de Agendamento Full Stack
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+O **Bioschedule** é uma solução completa para gestão de clínicas e profissionais liberais, desenvolvida para automatizar o fluxo de agendamentos e melhorar a comunicação com pacientes. O projeto integra uma interface administrativa robusta, um portal público de autoatendimento e notificações automatizadas via WhatsApp.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+##  Arquitetura do Sistema
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+O sistema foi concebido sob uma arquitetura de **Microserviços Desacoplados**, garantindo que o frontend e o backend possam evoluir de forma independente, comunicando-se através de uma API RESTful segura.
 
-## Project setup
+###  Ecossistema Tecnológico (The Stack)
 
-```bash
-$ npm install
-```
+| Camada | Tecnologia | Propósito |
+| :--- | :--- | :--- |
+| **Frontend** | React 19 + Vite | Interface de alta performance com renderização otimizada. |
+| **Backend** | NestJS (Node.js) | Arquitetura modular com injeção de dependência para a API. |
+| **Banco de Dados** | PostgreSQL + Prisma | Persistência relacional com tipagem estática e migrações seguras. |
+| **Estilização** | Tailwind CSS | Design responsivo baseado em tokens de utilidade. |
+| **Notificações** | Baileys + Resend | Automação de mensagens via WhatsApp e e-mails transacionais. |
+| **Segurança** | JWT + Bcrypt | Autenticação baseada em tokens e criptografia de credenciais. |
 
-## Compile and run the project
+---
 
-```bash
-# development
-$ npm run start
+##  Funcionalidades Principais
 
-# watch mode
-$ npm run start:dev
+###  Visão Administrativa (Profissional/Clínica)
+O painel administrativo oferece controle total sobre a operação:
+- **Dashboard Analítico:** Visualização em tempo real de agendamentos, métricas de atendimento e faturamento.
+- **Agenda Inteligente:** Controle visual de horários com bloqueios manuais e validação automática de conflitos.
+- **Prontuário de Pacientes:** Gestão de dados cadastrais, histórico de consultas e anexos de fotos/exames.
+- **Gestão de Equipe e Serviços:** Configuração de múltiplos profissionais, serviços personalizados com valores e durações específicas.
 
-# production mode
-$ npm run start:prod
-```
+###  Visão do Paciente (Portal Público)
+Uma interface simplificada focada na conversão e facilidade:
+- **Autoatendimento:** O paciente pode escolher o serviço, o profissional e o horário disponível sem precisar de login.
+- **Validação por CPF:** Identificação automática de pacientes já cadastrados para agilizar o processo.
+- **Confirmação Instantânea:** Após o agendamento, o sistema dispara notificações de confirmação automaticamente.
 
-## Run tests
+---
 
-```bash
-# unit tests
-$ npm run test
+##  Como o Projeto Funciona?
 
-# e2e tests
-$ npm run test:e2e
+1.  **O Backend (API):** Desenvolvido em NestJS, ele expõe endpoints protegidos por JWT. Utiliza o Prisma para garantir que as consultas ao banco sejam rápidas e seguras. A lógica de "conflito de horários" é processada aqui, garantindo que nenhum profissional tenha dois agendamentos no mesmo minuto.
+2.  **O Frontend (Web):** Uma SPA (Single Page Application) que consome a API. Utiliza o React Router para navegação e o Tailwind para garantir que o sistema funcione perfeitamente em computadores, tablets e celulares.
+3.  **A Integração WhatsApp:** Através da biblioteca Baileys, o sistema mantém uma sessão ativa do WhatsApp Web, permitindo o envio de mensagens de confirmação e lembretes sem custos de APIs pagas de terceiros.
 
-# test coverage
-$ npm run test:cov
-```
+---
 
-## Deployment
+##  Como Rodar o Projeto
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+O projeto está dividido em dois repositórios principais:
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+1.  [**Bioschedule Backend**](https://github.com/mendoncaluucas/bioschedule-backend ): Contém a lógica de negócio, banco de dados e integrações.
+2.  [**Bioschedule Frontend**](https://github.com/mendoncaluucas/bioschedule-frontend ): Contém a interface do usuário e portal de agendamento.
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+---
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+##  Contexto Acadêmico
+Este projeto foi desenvolvido como trabalho final da disciplina de **Programação Web**. O objetivo foi aplicar conceitos avançados de desenvolvimento Full Stack, integração de APIs de terceiros, modelagem de dados relacional e experiência do usuário (UX).
 
-## Resources
 
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
