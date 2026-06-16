@@ -18,8 +18,9 @@ export class AgendamentoController {
   async buscarHorarios(
     @Query('data') data: string,
     @Query('profissionalId') profissionalId: string,
+    @Query('servicoId') servicoId: string,
   ) {
-    return this.agendamentoService.listarHorariosDisponiveis(data, profissionalId);
+    return this.agendamentoService.listarHorariosDisponiveis(data, profissionalId, servicoId);
   }
 
   // ✨ Busca dados básicos do paciente pelo CPF para auto-preenchimento

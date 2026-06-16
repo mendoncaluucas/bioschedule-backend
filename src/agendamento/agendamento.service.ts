@@ -18,30 +18,56 @@ export class AgendamentoService {
   // ==========================================
   // VALIDAÇÃO DE REGRAS 
   // ==========================================
+  // Converte string "HH:MM" para minutos desde meia-noite (sem usar toLocaleTimeString)
+  private horaParaMinutos(horaStr: string): number {
+    const [h, m] = horaStr.split(':').map(Number);
+    return h * 60 + (m || 0);
+  }
+
   private async validarRegrasAgenda(data_inicio: string, data_fim: string, profissionalId: string, ignorarId?: string) {
     const inicio = new Date(data_inicio);
+    const fim = new Date(data_fim);
     const diaSemana = inicio.getDay();
-    const horaMinutoInicio = inicio.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+    // Comparação numérica segura — sem toLocaleTimeString
+    const minInicio = inicio.getUTCHours() * 60 + inicio.getUTCMinutes();
 
     const config = await this.prisma.configuracaoAgenda.findUnique({ where: { dia_semana: diaSemana } });
     if (!config || !config.ativo) throw new BadRequestException('Clínica fechada neste dia.');
 
-    if (horaMinutoInicio < config.abertura || horaMinutoInicio >= config.fechamento) {
+    const minAbertura = this.horaParaMinutos(config.abertura);
+    const minFechamento = this.horaParaMinutos(config.fechamento);
+    const minAlmocoInicio = this.horaParaMinutos(config.almoco_inicio);
+    const minAlmocoFim = this.horaParaMinutos(config.almoco_fim);
+
+    if (minInicio < minAbertura || minInicio >= minFechamento) {
       throw new BadRequestException(`Fora do expediente (${config.abertura} - ${config.fechamento}).`);
     }
 
-    if (horaMinutoInicio >= config.almoco_inicio && horaMinutoInicio < config.almoco_fim) {
+    if (minInicio >= minAlmocoInicio && minInicio < minAlmocoFim) {
       throw new BadRequestException('Horário de almoço/pausa.');
     }
 
+    // Verificar conflito com bloqueios cadastrados
+    const bloqueio = await this.prisma.bloqueio.findFirst({
+      where: {
+        data_inicio: { lt: fim },
+        data_fim: { gt: inicio },
+      },
+    });
+    if (bloqueio) throw new BadRequestException(`Horário bloqueado${bloqueio.motivo ? ': ' + bloqueio.motivo : '.'}`);
+
+    // Verificar conflito com outros agendamentos do profissional
     const conflito = await this.prisma.agendamento.findFirst({
       where: {
-        id: { not: ignorarId }, 
-        profissionalId: profissionalId, 
-        OR: [{ data_inicio: { lt: new Date(data_fim) }, data_fim: { gt: new Date(data_inicio) } }]
+        id: { not: ignorarId },
+        profissionalId: profissionalId,
+        status: { notIn: ['CANCELADO', 'FALTOU'] },
+        data_inicio: { lt: fim },
+        data_fim: { gt: inicio },
       }
     });
-    
+
     if (conflito) throw new BadRequestException('Este profissional já possui um agendamento neste horário.');
   }
 
@@ -51,7 +77,7 @@ export class AgendamentoService {
   async create(dto: CreateAgendamentoDto) {
     await this.validarRegrasAgenda(dto.data_inicio, dto.data_fim, dto.profissionalId);
 
-    return this.prisma.agendamento.create({
+    const agendamento = await this.prisma.agendamento.create({
       data: {
         data_inicio: new Date(dto.data_inicio),
         data_fim: new Date(dto.data_fim),
@@ -63,6 +89,28 @@ export class AgendamentoService {
       },
       include: { paciente: true, servico: true, profissional: { select: { id: true, nome: true } } }
     });
+
+    // Disparar WhatsApp de confirmação (não-bloqueante)
+    try {
+      const dataObj = new Date(dto.data_inicio);
+      const dataFormatada = dataObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const horaFormatada = dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+      await this.whatsappService.sendMessage(
+        agendamento.paciente.telefone,
+        `✨ *BioSchedule - Confirmação de Agendamento*\n\n` +
+        `Olá, ${agendamento.paciente.nome}! Seu horário foi confirmado:\n\n` +
+        `📅 Data: ${dataFormatada}\n` +
+        `⏰ Hora: ${horaFormatada}\n` +
+        `✂️ Procedimento: ${agendamento.servico.nome}\n` +
+        `👤 Profissional: ${agendamento.profissional.nome}\n\n` +
+        `Qualquer dúvida, entre em contato conosco. Te esperamos! 💙`
+      );
+    } catch (err) {
+      this.logger.error('Falha não crítica ao disparar WhatsApp (admin):', err);
+    }
+
+    return agendamento;
   }
 
   // ==========================================
@@ -178,39 +226,80 @@ export class AgendamentoService {
   // ==========================================
   // BUSCAR HORÁRIOS LIVRES
   // ==========================================
-  async listarHorariosDisponiveis(data: string, profissionalId: string) {
+  async listarHorariosDisponiveis(data: string, profissionalId: string, servicoId: string) {
     const inicioDia = new Date(`${data}T00:00:00`);
     const fimDia = new Date(`${data}T23:59:59`);
     const diaSemana = inicioDia.getDay();
 
+    // 1. Verificar se a clínica abre neste dia
     const config = await this.prisma.configuracaoAgenda.findUnique({ where: { dia_semana: diaSemana } });
-    if (!config || !config.ativo) return []; 
+    if (!config || !config.ativo) return [];
 
+    // 2. Buscar duração do serviço selecionado
+    const servico = await this.prisma.servico.findUnique({ where: { id: servicoId } });
+    if (!servico) return [];
+    const duracaoMin = servico.duracao_minutos;
+    const MARGEM_MIN = 10; // 10 min de preparo entre pacientes
+    const GRANULARIDADE_MIN = 30; // slots a cada 30 minutos
+
+    // 3. Converter horários de configuração para minutos
+    const minAbertura = this.horaParaMinutos(config.abertura);
+    const minFechamento = this.horaParaMinutos(config.fechamento);
+    const minAlmocoInicio = this.horaParaMinutos(config.almoco_inicio);
+    const minAlmocoFim = this.horaParaMinutos(config.almoco_fim);
+
+    // 4. Buscar agendamentos ocupados do dia (excluindo cancelados e faltas)
     const agendamentosOcupados = await this.prisma.agendamento.findMany({
       where: {
-        profissionalId: profissionalId,
+        profissionalId,
         data_inicio: { gte: inicioDia, lte: fimDia },
-        status: { notIn: ['CANCELADO', 'FALTOU'] } 
+        status: { notIn: ['CANCELADO', 'FALTOU'] },
       },
     });
 
-    const [horaAbre] = config.abertura.split(':').map(Number);
-    const [horaFecha] = config.fechamento.split(':').map(Number);
-    const [horaAlmocoInicio] = config.almoco_inicio.split(':').map(Number);
-    const [horaAlmocoFim] = config.almoco_fim.split(':').map(Number);
-
-    const gradeTrabalho: string[] = [];
-    for (let i = horaAbre; i < horaFecha; i++) {
-      if (i >= horaAlmocoInicio && i < horaAlmocoFim) continue; 
-      const horaFormatada = i.toString().padStart(2, '0') + ':00';
-      gradeTrabalho.push(horaFormatada);
-    }
-
-    const horariosOcupadosFormatados = agendamentosOcupados.map(ag => {
-      return ag.data_inicio.getHours().toString().padStart(2, '0') + ':' + ag.data_inicio.getMinutes().toString().padStart(2, '0');
+    // 5. Buscar bloqueios que se sobrepõem ao dia
+    const bloqueiosDoDia = await this.prisma.bloqueio.findMany({
+      where: {
+        data_inicio: { lt: fimDia },
+        data_fim: { gt: inicioDia },
+      },
     });
 
-    return gradeTrabalho.filter(h => !horariosOcupadosFormatados.includes(h));
+    // 6. Gerar slots a cada GRANULARIDADE_MIN dentro do expediente
+    const slotsDisponiveis: string[] = [];
+
+    for (let minSlot = minAbertura; minSlot + duracaoMin <= minFechamento; minSlot += GRANULARIDADE_MIN) {
+      const minFimSlot = minSlot + duracaoMin;
+
+      // Excluir slots que caem no horário de almoço
+      if (minSlot < minAlmocoFim && minFimSlot > minAlmocoInicio) continue;
+
+      // Montar Date objects do slot para comparação com bloqueios
+      const slotInicio = new Date(`${data}T${String(Math.floor(minSlot / 60)).padStart(2, '0')}:${String(minSlot % 60).padStart(2, '0')}:00`);
+      const slotFim = new Date(slotInicio.getTime() + duracaoMin * 60000);
+
+      // Verificar conflito com bloqueios (overlap real)
+      const bloqueado = bloqueiosDoDia.some(bl =>
+        slotInicio < bl.data_fim && slotFim > bl.data_inicio
+      );
+      if (bloqueado) continue;
+
+      // Verificar conflito com agendamentos existentes (overlap real + margem)
+      const ocupado = agendamentosOcupados.some(ag => {
+        const agInicioMin = ag.data_inicio.getHours() * 60 + ag.data_inicio.getMinutes();
+        const agFimMin = ag.data_fim.getHours() * 60 + ag.data_fim.getMinutes() + MARGEM_MIN;
+        // Slot colide se começa antes do fim (+ margem) do agendamento E termina depois do início
+        return minSlot < agFimMin && minFimSlot > agInicioMin;
+      });
+      if (ocupado) continue;
+
+      // Slot está livre — formatar e adicionar
+      const h = String(Math.floor(minSlot / 60)).padStart(2, '0');
+      const m = String(minSlot % 60).padStart(2, '0');
+      slotsDisponiveis.push(`${h}:${m}`);
+    }
+
+    return slotsDisponiveis;
   }
 
   async findAll() {
