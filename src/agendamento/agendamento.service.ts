@@ -4,6 +4,7 @@ import { MailService } from '../email/mail.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { CreateAgendamentoDto } from './dto/create-agendamento.dto';
 import { UpdateAgendamentoDto } from './dto/update-agendamento.dto';
+import { minutosBrasilia, diaSemanaBrasilia, instanteBrasilia, horaBrasilia, dataBrasilia, TZ_BRASILIA_OFFSET } from '../common/timezone';
 
 @Injectable()
 export class AgendamentoService {
@@ -27,10 +28,14 @@ export class AgendamentoService {
   private async validarRegrasAgenda(data_inicio: string, data_fim: string, profissionalId: string, ignorarId?: string) {
     const inicio = new Date(data_inicio);
     const fim = new Date(data_fim);
-    const diaSemana = inicio.getDay();
 
-    // Comparação numérica segura — sem toLocaleTimeString
-    const minInicio = inicio.getUTCHours() * 60 + inicio.getUTCMinutes();
+    if (fim <= inicio) {
+      throw new BadRequestException('A data de fim deve ser posterior à data de início.');
+    }
+
+    // Dia da semana e horário no fuso de Brasília (independente do fuso do servidor)
+    const diaSemana = diaSemanaBrasilia(inicio);
+    const minInicio = minutosBrasilia(inicio);
 
     const config = await this.prisma.configuracaoAgenda.findUnique({ where: { dia_semana: diaSemana } });
     if (!config || !config.ativo) throw new BadRequestException('Clínica fechada neste dia.');
@@ -93,8 +98,8 @@ export class AgendamentoService {
     // Disparar WhatsApp de confirmação (não-bloqueante)
     try {
       const dataObj = new Date(dto.data_inicio);
-      const dataFormatada = dataObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-      const horaFormatada = dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
+      const dataFormatada = dataBrasilia(dataObj);
+      const horaFormatada = horaBrasilia(dataObj);
 
       await this.whatsappService.sendMessage(
         agendamento.paciente.telefone,
@@ -174,7 +179,7 @@ export class AgendamentoService {
 
     if (!servico) throw new BadRequestException('Serviço não encontrado.');
 
-    const dataInicio = new Date(`${dados.data}T${dados.hora}:00`);
+    const dataInicio = instanteBrasilia(dados.data, dados.hora);
     const dataFim = new Date(dataInicio.getTime() + servico.duracao_minutos * 60000);
 
     await this.validarRegrasAgenda(dataInicio.toISOString(), dataFim.toISOString(), dados.profissionalId);
@@ -227,9 +232,11 @@ export class AgendamentoService {
   // BUSCAR HORÁRIOS LIVRES
   // ==========================================
   async listarHorariosDisponiveis(data: string, profissionalId: string, servicoId: string) {
-    const inicioDia = new Date(`${data}T00:00:00`);
-    const fimDia = new Date(`${data}T23:59:59`);
-    const diaSemana = inicioDia.getDay();
+    // Janela do dia e dia da semana no fuso de Brasília (servidor pode rodar em UTC)
+    const inicioDia = new Date(`${data}T00:00:00${TZ_BRASILIA_OFFSET}`);
+    const fimDia = new Date(`${data}T23:59:59${TZ_BRASILIA_OFFSET}`);
+    const [ano, mes, dia] = data.split('-').map(Number);
+    const diaSemana = new Date(Date.UTC(ano, mes - 1, dia)).getUTCDay();
 
     // 1. Verificar se a clínica abre neste dia
     const config = await this.prisma.configuracaoAgenda.findUnique({ where: { dia_semana: diaSemana } });
@@ -274,8 +281,8 @@ export class AgendamentoService {
       // Excluir slots que caem no horário de almoço
       if (minSlot < minAlmocoFim && minFimSlot > minAlmocoInicio) continue;
 
-      // Montar Date objects do slot para comparação com bloqueios
-      const slotInicio = new Date(`${data}T${String(Math.floor(minSlot / 60)).padStart(2, '0')}:${String(minSlot % 60).padStart(2, '0')}:00`);
+      // Montar Date objects do slot (instante UTC a partir do relógio de Brasília) para comparação com bloqueios
+      const slotInicio = new Date(`${data}T${String(Math.floor(minSlot / 60)).padStart(2, '0')}:${String(minSlot % 60).padStart(2, '0')}:00${TZ_BRASILIA_OFFSET}`);
       const slotFim = new Date(slotInicio.getTime() + duracaoMin * 60000);
 
       // Verificar conflito com bloqueios (overlap real)
@@ -286,8 +293,8 @@ export class AgendamentoService {
 
       // Verificar conflito com agendamentos existentes (overlap real + margem)
       const ocupado = agendamentosOcupados.some(ag => {
-        const agInicioMin = ag.data_inicio.getHours() * 60 + ag.data_inicio.getMinutes();
-        const agFimMin = ag.data_fim.getHours() * 60 + ag.data_fim.getMinutes() + MARGEM_MIN;
+        const agInicioMin = minutosBrasilia(ag.data_inicio);
+        const agFimMin = minutosBrasilia(ag.data_fim) + MARGEM_MIN;
         // Slot colide se começa antes do fim (+ margem) do agendamento E termina depois do início
         return minSlot < agFimMin && minFimSlot > agInicioMin;
       });

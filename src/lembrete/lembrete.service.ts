@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
+import { paraBrasilia, instanteBrasilia, horaBrasilia } from '../common/timezone';
 
 @Injectable()
 export class LembreteService {
@@ -17,13 +18,13 @@ export class LembreteService {
   async enviarLembretesParaAmanha() {
     this.logger.log('Iniciando rotina de lembretes das 08:00...');
 
-    // 1. Calcula a data de amanhã
-    const amanha = new Date();
-    amanha.setDate(amanha.getDate() + 1);
-    amanha.setUTCHours(0, 0, 0, 0);
+    // 1. Calcula a data de amanhã no fuso de Brasília (servidor roda em UTC)
+    const amanhaBrasilia = paraBrasilia(new Date());
+    amanhaBrasilia.setUTCDate(amanhaBrasilia.getUTCDate() + 1);
+    const dataAmanha = `${amanhaBrasilia.getUTCFullYear()}-${String(amanhaBrasilia.getUTCMonth() + 1).padStart(2, '0')}-${String(amanhaBrasilia.getUTCDate()).padStart(2, '0')}`;
 
-    const fimAmanha = new Date(amanha);
-    fimAmanha.setUTCHours(23, 59, 59, 999);
+    const amanha = instanteBrasilia(dataAmanha, '00:00');
+    const fimAmanha = instanteBrasilia(dataAmanha, '23:59');
 
     // 2. Procura agendamentos (Ignora os CANCELADOS ou CONCLUIDOS)
     const agendamentos = await this.prisma.agendamento.findMany({
@@ -45,8 +46,8 @@ export class LembreteService {
     // 3. Dispara lembretes reais via WhatsApp
     let enviados = 0;
     for (const agendamento of agendamentos) {
-      // Pega o horário no formato HH:MM
-      const hora = agendamento.data_inicio.toISOString().substring(11, 16); 
+      // Pega o horário no formato HH:MM (fuso de Brasília)
+      const hora = horaBrasilia(agendamento.data_inicio);
       
       try {
         await this.whatsappService.sendMessage(

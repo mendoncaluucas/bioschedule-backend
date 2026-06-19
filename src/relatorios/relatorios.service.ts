@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit-table';
 import { PrismaService } from '../prisma/prisma.service';
+import { paraBrasilia, horaBrasilia } from '../common/timezone';
 
 @Injectable()
 export class RelatoriosService {
@@ -12,16 +13,16 @@ export class RelatoriosService {
   // ==========================================
 
   private formatarDataSegura(date: Date): string {
-    const d = String(date.getDate()).padStart(2, '0');
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const y = date.getFullYear();
+    // Formata no fuso de Brasília (servidor pode rodar em UTC)
+    const b = paraBrasilia(date);
+    const d = String(b.getUTCDate()).padStart(2, '0');
+    const m = String(b.getUTCMonth() + 1).padStart(2, '0');
+    const y = b.getUTCFullYear();
     return `${d}/${m}/${y}`;
   }
 
   private formatarHoraSegura(date: Date): string {
-    const h = String(date.getHours()).padStart(2, '0');
-    const min = String(date.getMinutes()).padStart(2, '0');
-    return `${h}:${min}`;
+    return horaBrasilia(date);
   }
 
   private formatarPeriodo(inicio: string, fim: string): string {

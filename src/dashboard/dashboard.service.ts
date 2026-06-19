@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { horaBrasilia, dataBrasilia, dataCurtaBrasilia } from '../common/timezone';
 
 @Injectable()
 export class DashboardService {
@@ -153,10 +154,7 @@ export class DashboardService {
     agendamentos
       .filter(a => a.status !== 'CANCELADO')
       .forEach(a => {
-        const label = a.data_inicio.toLocaleDateString('pt-BR', {
-          day: '2-digit',
-          month: '2-digit',
-        });
+        const label = dataCurtaBrasilia(a.data_inicio);
         const existing = graficoMap.get(label) || {
           atendimentos: 0,
           faturamento: 0,
@@ -182,8 +180,8 @@ export class DashboardService {
       .slice(0, 10)
       .map(a => ({
         id: a.id,
-        hora: a.data_inicio.toISOString().substring(11, 16),
-        data: a.data_inicio.toLocaleDateString('pt-BR'),
+        hora: horaBrasilia(a.data_inicio),
+        data: dataBrasilia(a.data_inicio),
         paciente: a.paciente.nome,
         servico: a.servico.nome,
         valor: Number(a.servico.valor),
