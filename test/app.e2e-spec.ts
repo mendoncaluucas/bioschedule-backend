@@ -1,8 +1,17 @@
+jest.mock('@whiskeysockets/baileys', () => ({
+  useMultiFileAuthState: jest.fn().mockResolvedValue({ state: {}, saveCreds: jest.fn() }),
+  DisconnectReason: { loggedOut: 401 },
+  default: jest.fn(() => ({
+    ev: { on: jest.fn() },
+    logout: jest.fn(),
+  })),
+}));
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import request from 'supertest'; 
+import * as request from 'supertest'; 
 import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma/prisma.service';
+import { WhatsappService } from './../src/whatsapp/whatsapp.service';
 import * as bcrypt from 'bcrypt';
 
 describe('AppController (e2e)', () => {
@@ -13,7 +22,14 @@ describe('AppController (e2e)', () => {
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+    .overrideProvider(WhatsappService)
+    .useValue({
+      sendMessage: jest.fn(),
+      onModuleInit: jest.fn(),
+      conectarWhatsApp: jest.fn(),
+    })
+    .compile();
 
     app = moduleFixture.createNestApplication();
 
@@ -28,17 +44,8 @@ describe('AppController (e2e)', () => {
     // Pegamos a instância do Prisma para preparar o banco
     prisma = app.get<PrismaService>(PrismaService);
 
-    // Limpeza de segurança e Seed (Criação do usuário de teste)
-    await prisma.usuario.deleteMany(); // Remove lixo de testes anteriores
-    
-    const hash = await bcrypt.hash('senha123', 10);
-    await prisma.usuario.create({
-      data: {
-        nome: 'Admin Teste',
-        email: 'admin@bioschedule.com',
-        senha: hash,
-      },
-    });
+    // Removida a limpeza de banco para evitar a deleção dos dados na apresentação!
+    // Apenas testamos o fluxo de ponta a ponta assumindo que o admin existe.
   });
 
   // Fecha as conexões para o Jest não ficar "pendurado" no terminal
@@ -64,7 +71,7 @@ describe('AppController (e2e)', () => {
       .post('/auth/login')
       .send({
         email: 'admin@bioschedule.com',
-        senha: 'senha123',
+        senha: 'admin',
       })
       .expect(200)
       .then((response) => {
@@ -76,7 +83,7 @@ describe('AppController (e2e)', () => {
     // 1. Fazemos login para obter um token real
     const loginRes = await (request(app.getHttpServer()) as any)
       .post('/auth/login')
-      .send({ email: 'admin@bioschedule.com', senha: 'senha123' });
+      .send({ email: 'admin@bioschedule.com', senha: 'admin' });
 
     const token = loginRes.body.access_token;
 
@@ -90,7 +97,7 @@ describe('AppController (e2e)', () => {
   it('/paciente (POST) - Deve retornar 400 ao enviar dados inválidos', async () => {
     const loginRes = await (request(app.getHttpServer()) as any)
       .post('/auth/login')
-      .send({ email: 'admin@bioschedule.com', senha: 'senha123' });
+      .send({ email: 'admin@bioschedule.com', senha: 'admin' });
 
     const token = loginRes.body.access_token;
 

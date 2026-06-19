@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { BloqueioService } from './bloqueio.service';
 import { CreateBloqueioDto } from './dto/create-bloqueio.dto';
 import { UpdateBloqueioDto } from './dto/update-bloqueio.dto';
-import { AuthGuard } from 'src/auth/auth.guard';
+import { AuthGuard } from '../auth/auth.guard';
 
 @ApiTags('Bloqueios de Agenda')
 @ApiBearerAuth()
