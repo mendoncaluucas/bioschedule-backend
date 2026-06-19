@@ -1,7 +1,7 @@
-import { 
-  Controller, Get, Post, Body, Patch, Put, Param, Delete, 
-  UseGuards, HttpCode, HttpStatus, UseInterceptors, 
-  UploadedFile, BadRequestException 
+import {
+  Controller, Get, Post, Body, Patch, Put, Param, Delete,
+  UseGuards, HttpCode, HttpStatus, UseInterceptors,
+  UploadedFile, BadRequestException
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '../auth/auth.guard';
@@ -9,9 +9,7 @@ import { ApiBearerAuth, ApiTags, ApiConsumes } from '@nestjs/swagger';
 import { PacienteService } from './paciente.service';
 import { CreatePacienteDto } from './dto/create-paciente.dto';
 import { UpdatePacienteDto } from './dto/update-paciente.dto';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
-import * as fs from 'fs';
+import { memoryStorage } from 'multer';
 
 @Controller('paciente') // Voltamos para o padrão singular exato do seu frontend
 @UseGuards(AuthGuard)
@@ -55,29 +53,26 @@ export class PacienteController {
   }
 
   @Post(':id/foto')
-  @ApiConsumes('multipart/form-data') 
+  @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file', {
-    storage: diskStorage({
-      destination: (req, file, cb) => {
-        const uploadPath = './uploads';
-        if (!fs.existsSync(uploadPath)) {
-          fs.mkdirSync(uploadPath);
-        }
-        cb(null, uploadPath);
-      },
-      filename: (req, file, cb) => {
-        const randomName = Array(32).fill(null).map(() => (Math.round(Math.random() * 16)).toString(16)).join('');
-        cb(null, `${randomName}${extname(file.originalname)}`);
+    // Mantém o arquivo em memória para persistir como base64 no banco
+    // (o disco do Render é efêmero e perderia as imagens a cada redeploy)
+    storage: memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB por imagem
+    fileFilter: (_req, file, cb) => {
+      if (!file.mimetype.startsWith('image/')) {
+        return cb(new BadRequestException('Apenas arquivos de imagem são permitidos.'), false);
       }
-    })
+      cb(null, true);
+    },
   }))
   async uploadFoto(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo de imagem enviado.');
     }
-    const baseUrl = process.env.APP_BASE_URL || 'http://localhost:3000';
-    const fileUrl = `${baseUrl}/uploads/${file.filename}`;
-    return this.pacienteService.salvarFoto(id, fileUrl);
+    // Data URL base64 — persiste com o banco e é renderizada direto pelo <img src> no frontend
+    const dataUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+    return this.pacienteService.salvarFoto(id, dataUrl);
   }
 
   @Delete(':id/foto/:fotoId')
