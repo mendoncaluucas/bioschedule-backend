@@ -1,61 +1,66 @@
-#  Bioschedule: Sistema Inteligente de Agendamento Full Stack
+# 📅 BioSchedule - API de Agendamento para Clínicas (Back-end)
 
-O **Bioschedule** é uma solução completa para gestão de clínicas e profissionais liberais, desenvolvida para automatizar o fluxo de agendamentos e melhorar a comunicação com pacientes. O projeto integra uma interface administrativa robusta, um portal público de autoatendimento e notificações automatizadas via WhatsApp.
+![NestJS](https://img.shields.io/badge/NestJS_11-API_REST-E0234E?style=for-the-badge&logo=nestjs)
+![Prisma](https://img.shields.io/badge/Prisma_ORM-Database-2D3748?style=for-the-badge&logo=prisma)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Persistência-4169E1?style=for-the-badge&logo=postgresql)
+![JWT](https://img.shields.io/badge/Auth-JWT_Bearer-success?style=for-the-badge&logo=jsonwebtokens)
 
----
+A API RESTful do sistema **BioSchedule** é o núcleo de regras e persistência de um SaaS de agendamento para clínicas de estética. Operando de forma **desacoplada** do front-end, ela entrega os dados de forma rápida e estruturada e automatiza a comunicação com o paciente — confirmações e lembretes via WhatsApp — com o objetivo de reduzir as faltas (no-show).
 
-##  Arquitetura do Sistema
+## 💻 Stack Tecnológica
 
-O sistema foi concebido sob uma arquitetura de **Microserviços Desacoplados**, garantindo que o frontend e o backend possam evoluir de forma independente, comunicando-se através de uma API RESTful segura.
+A API foi construída sobre o ecossistema TypeScript, com foco em organização e segurança:
+*   **Framework:** NestJS 11 (arquitetura modular).
+*   **Persistência (ORM):** Prisma ORM com banco PostgreSQL.
+*   **Autenticação:** JWT + Passport para sessões sem estado.
+*   **Criptografia:** `bcrypt` para tratamento seguro de senhas.
+*   **Integrações:** Baileys (WhatsApp) e Resend (e-mail transacional).
 
-###  Ecossistema Tecnológico (The Stack)
+## 🔒 Destaques de Arquitetura e Segurança
 
-| Camada | Tecnologia | Propósito |
-| :--- | :--- | :--- |
-| **Frontend** | React 19 + Vite | Interface de alta performance com renderização otimizada. |
-| **Backend** | NestJS (Node.js) | Arquitetura modular com injeção de dependência para a API. |
-| **Banco de Dados** | PostgreSQL + Prisma | Persistência relacional com tipagem estática e migrações seguras. |
-| **Estilização** | Tailwind CSS | Design responsivo baseado em tokens de utilidade. |
-| **Notificações** | Baileys + Resend | Automação de mensagens via WhatsApp e e-mails transacionais. |
-| **Segurança** | JWT + Bcrypt | Autenticação baseada em tokens e criptografia de credenciais. |
+A API valida tudo que recebe e protege os dados em camadas:
+*   **Validação de Entrada:** DTOs com `class-validator` e um `ValidationPipe` global (modo *whitelist*) rejeitam payloads malformados e descartam campos não previstos antes de chegar ao banco.
+*   **Hash de Senhas:** `bcrypt` com *salt* garante que as senhas nunca sejam armazenadas em texto puro; no login é feita apenas a comparação segura com o hash.
+*   **Proteção de Rotas com Guards:** um *Guard* intercepta as requisições e valida o token JWT (formato Bearer) no cabeçalho, recusando acessos não autorizados (HTTP 401).
+*   **Separação de Responsabilidades:** o código é dividido em módulos por domínio (`/auth`, `/pacientes`, `/servicos`, `/agendamento`, `/bloqueio`, `/configuracao-agenda`, `/dashboard`, `/relatorios`, `/whatsapp`), cada um com controller, service e DTOs.
+*   **Automação Assíncrona:** lembretes diários (via cron) e confirmações são disparados no WhatsApp sem bloquear o fluxo principal da API.
 
----
+## ⚙️ Variáveis de Ambiente
 
-##  Funcionalidades Principais
+O projeto exige segredos que não devem ser versionados. Crie um arquivo `.env` na raiz da pasta com o seguinte formato:
 
-###  Visão Administrativa (Profissional/Clínica)
-O painel administrativo oferece controle total sobre a operação:
-- **Dashboard Analítico:** Visualização em tempo real de agendamentos, métricas de atendimento e faturamento.
-- **Agenda Inteligente:** Controle visual de horários com bloqueios manuais e validação automática de conflitos.
-- **Prontuário de Pacientes:** Gestão de dados cadastrais, histórico de consultas e anexos de fotos/exames.
-- **Gestão de Equipe e Serviços:** Configuração de múltiplos profissionais, serviços personalizados com valores e durações específicas.
+```env
+# URL de conexão do Prisma ORM (PostgreSQL)
+DATABASE_URL="postgresql://usuario:senha@localhost:5432/bioschedule?schema=public"
 
-###  Visão do Paciente (Portal Público)
-Uma interface simplificada focada na conversão e facilidade:
-- **Autoatendimento:** O paciente pode escolher o serviço, o profissional e o horário disponível sem precisar de login.
-- **Validação por CPF:** Identificação automática de pacientes já cadastrados para agilizar o processo.
-- **Confirmação Instantânea:** Após o agendamento, o sistema dispara notificações de confirmação automaticamente.
+# Chave criptográfica para assinatura dos tokens JWT
+JWT_SECRET="sua-chave-super-segura-de-no-minimo-32-caracteres"
 
----
+# Chave da API de e-mail transacional (Resend)
+RESEND_API_KEY="re_xxxxxxxxxxxxxxxxxxxx"
 
-##  Como o Projeto Funciona?
+# Porta da API (opcional - padrão: 3000)
+PORT=3000
+```
 
-1.  **O Backend (API):** Desenvolvido em NestJS, ele expõe endpoints protegidos por JWT. Utiliza o Prisma para garantir que as consultas ao banco sejam rápidas e seguras. A lógica de "conflito de horários" é processada aqui, garantindo que nenhum profissional tenha dois agendamentos no mesmo minuto.
-2.  **O Frontend (Web):** Uma SPA (Single Page Application) que consome a API. Utiliza o React Router para navegação e o Tailwind para garantir que o sistema funcione perfeitamente em computadores, tablets e celulares.
-3.  **A Integração WhatsApp:** Através da biblioteca Baileys, o sistema mantém uma sessão ativa do WhatsApp Web, permitindo o envio de mensagens de confirmação e lembretes sem custos de APIs pagas de terceiros.
+## 🚀 Passo a Passo de Execução
 
----
+Siga as instruções abaixo para executar a API localmente:
 
-##  Como Rodar o Projeto
+**1. Instalar Dependências:** instale os pacotes do ecossistema:
+```bash
+npm install
+```
 
-O projeto está dividido em dois repositórios principais:
+**2. Configurar o Banco de Dados:** sincronize a modelagem e crie as tabelas necessárias:
+```bash
+npx prisma migrate dev
+```
+*(Alternativamente, utilize `npx prisma db push` para empurrar o schema diretamente.)*
 
-1.  [**Bioschedule Backend**](https://github.com/mendoncaluucas/bioschedule-backend ): Contém a lógica de negócio, banco de dados e integrações.
-2.  [**Bioschedule Frontend**](https://github.com/mendoncaluucas/bioschedule-frontend ): Contém a interface do usuário e portal de agendamento.
+**3. Iniciar o Servidor:** suba a API em modo de desenvolvimento (com hot-reload):
+```bash
+npm run start:dev
+```
 
----
-
-##  Contexto Acadêmico
-Este projeto foi desenvolvido como trabalho final da disciplina de **Programação Web**. O objetivo foi aplicar conceitos avançados de desenvolvimento Full Stack, integração de APIs de terceiros, modelagem de dados relacional e experiência do usuário (UX).
-
-
+A API estará operante em `http://localhost:3000`, e a documentação interativa (Swagger) em `http://localhost:3000/api`.
