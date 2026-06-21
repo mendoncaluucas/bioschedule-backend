@@ -15,6 +15,9 @@ export class WhatsappService implements OnModuleInit {
   private qrCode: string | null = null;
   private isConnected = false;
   private reconnectAttempts = 0;
+  private readonly MAX_RECONNECT_ATTEMPTS = 10;
+  private isInitializing = false;
+  private reconnectTimer: NodeJS.Timeout | null = null;
   private status: 'disconnected' | 'connecting' | 'waiting_qr' | 'connected' | 'logged_out' = 'disconnected';
   private readonly logger = new Logger(WhatsappService.name);
 
@@ -23,6 +26,17 @@ export class WhatsappService implements OnModuleInit {
   }
 
   private async initializeClient() {
+    // Evita inicializações concorrentes: vários eventos 'close' (de sockets antigos)
+    // poderiam disparar makeWASocket em paralelo, acumulando sockets/listeners.
+    if (this.isInitializing) {
+      this.logger.warn('Inicialização do WhatsApp já em andamento — chamada concorrente ignorada.');
+      return;
+    }
+    this.isInitializing = true;
+
+    // Encerra o socket anterior antes de criar um novo (evita leak de listeners/timers).
+    this.teardownSocket();
+
     this.status = 'connecting';
     this.qrCode = null;
 
@@ -91,18 +105,55 @@ export class WhatsappService implements OnModuleInit {
       this.status = 'disconnected';
       // Reconectar após erro de inicialização
       this.reconnectComDelay();
+    } finally {
+      this.isInitializing = false;
     }
+  }
+
+  /**
+   * Encerra o socket atual e remove seus listeners para liberar recursos.
+   * Os listeners são removidos ANTES do end() para que o 'close' resultante
+   * não dispare uma reconexão espúria.
+   */
+  private teardownSocket() {
+    if (!this.socket) return;
+    try {
+      const ev: any = this.socket.ev;
+      ev?.removeAllListeners?.('connection.update');
+      ev?.removeAllListeners?.('creds.update');
+      this.socket.end(undefined);
+    } catch (err) {
+      this.logger.warn('Falha ao encerrar socket anterior (ignorada).');
+    }
+    this.socket = undefined as unknown as WASocket;
   }
 
   /**
    * Reconecta com delay exponencial (3s, 6s, 12s... máx 30s)
    */
   private reconnectComDelay() {
+    // Já há um reconnect agendado: não empilhar outro (evita tempestade de reconexão
+    // quando vários sockets emitem 'close' em sequência).
+    if (this.reconnectTimer) {
+      return;
+    }
+
+    // Teto de tentativas: evita loop de reconexão infinito quando a conexão nunca abre.
+    if (this.reconnectAttempts >= this.MAX_RECONNECT_ATTEMPTS) {
+      this.logger.error(
+        `❌ Limite de ${this.MAX_RECONNECT_ATTEMPTS} tentativas de reconexão atingido. ` +
+        `Reconexão automática desabilitada. Use POST /whatsapp/reset para tentar novamente.`,
+      );
+      this.status = 'disconnected';
+      return;
+    }
+
     this.reconnectAttempts++;
     const delay = Math.min(3000 * Math.pow(2, this.reconnectAttempts - 1), 30000);
-    this.logger.log(`🔄 Tentando reconectar em ${delay / 1000}s (tentativa ${this.reconnectAttempts})...`);
+    this.logger.log(`🔄 Tentando reconectar em ${delay / 1000}s (tentativa ${this.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS})...`);
 
-    setTimeout(() => {
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
       this.initializeClient();
     }, delay);
   }
@@ -188,15 +239,19 @@ export class WhatsappService implements OnModuleInit {
    */
   async forcarReset(): Promise<void> {
     this.logger.warn('🔄 Reset manual solicitado. Limpando sessão...');
-    
-    // Fechar socket atual se existir
-    try {
-      this.socket?.end(undefined);
-    } catch (_) {}
+
+    // Cancela qualquer reconexão agendada para não correr em paralelo com o reset.
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    // Encerra o socket atual (remove listeners + end).
+    this.teardownSocket();
 
     this.isConnected = false;
     this.qrCode = null;
-    this.reconnectAttempts = 0;
+    this.reconnectAttempts = 0; // Reabilita a reconexão automática após o reset
     this.limparCredenciais();
 
     // Reinicializar

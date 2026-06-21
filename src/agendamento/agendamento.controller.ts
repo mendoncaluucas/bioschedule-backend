@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param, Delete, Patch, HttpCode, HttpStatus
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AgendamentoService } from './agendamento.service';
 import { CreateAgendamentoDto } from './dto/create-agendamento.dto';
+import { CreateAgendamentoPublicoDto } from './dto/create-agendamento-publico.dto';
 import { UpdateAgendamentoDto } from './dto/update-agendamento.dto';
 import { AuthGuard } from '../auth/auth.guard';
 
@@ -30,7 +31,7 @@ export class AgendamentoController {
   }
 
   @Post('publico')
-  async criarAgendamentoPublico(@Body() dados: any) {
+  async criarAgendamentoPublico(@Body() dados: CreateAgendamentoPublicoDto) {
     return this.agendamentoService.agendarPublico(dados);
   }
 
