@@ -7,8 +7,9 @@ export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
   async getResumoPeriodo(inicio: string, fim: string) {
-    const dataInicio = new Date(`${inicio}T00:00:00.000Z`);
-    const dataFim = new Date(`${fim}T23:59:59.999Z`);
+    // Fronteiras do período no fuso de Brasília (servidor roda em UTC no Render)
+    const dataInicio = new Date(`${inicio}T00:00:00.000-03:00`);
+    const dataFim = new Date(`${fim}T23:59:59.999-03:00`);
 
     // ========================================
     // 1. BUSCAR AGENDAMENTOS DO PERÍODO
@@ -139,15 +140,14 @@ export class DashboardService {
       { atendimentos: number; faturamento: number }
     >();
 
-    // Inicializar todos os dias do intervalo
-    const cursor = new Date(dataInicio);
+    // Inicializar todos os dias do intervalo — rótulos no fuso de Brasília,
+    // iguais aos usados no preenchimento (dataCurtaBrasilia), avançando 24h por dia.
+    const UM_DIA_MS = 24 * 60 * 60 * 1000;
+    let cursor = new Date(dataInicio);
     while (cursor <= dataFim) {
-      const label = cursor.toLocaleDateString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-      });
+      const label = dataCurtaBrasilia(cursor);
       graficoMap.set(label, { atendimentos: 0, faturamento: 0 });
-      cursor.setDate(cursor.getDate() + 1);
+      cursor = new Date(cursor.getTime() + UM_DIA_MS);
     }
 
     // Preencher com dados reais (apenas não-cancelados)
