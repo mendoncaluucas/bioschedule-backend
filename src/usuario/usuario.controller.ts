@@ -3,6 +3,7 @@ import { UsuarioService } from './usuario.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { AuthGuard } from '../auth/auth.guard';
+import { AdminGuard } from '../auth/admin.guard';
 
 @Controller('usuarios')
 export class UsuarioController {
@@ -27,19 +28,19 @@ export class UsuarioController {
   // 🔒 ROTAS PRIVADAS (Painel Administrativo)
   // ==========================================
 
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, AdminGuard)
   @Get()
   findAll() {
     return this.usuarioService.findAll();
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, AdminGuard)
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateData: UpdateUsuarioDto) {
     return this.usuarioService.update(id, updateData);
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, AdminGuard)
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id') id: string) {
